@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Safe Route</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav" aria-label="Main navigation"><a href="home.html">Home</a><a href="unsafe.html">Check‑in</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Safe Route Planner</h2>
+      <p class="muted">Enter start and end. After route is found, the backend returns lighting, crime% and crowd% along the route and an aggregated safe percentage.</p>
+
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <input id="start" class="input" placeholder="Start location" />
+        <input id="end" class="input" placeholder="End location" />
+        <button id="routeBtn" class="btn primary">Show Route & Safe Score</button>
+      </div>
+
+      <div id="routeSummary" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card">
+      <div id="map" style="height:480px;border-radius:12px;overflow:hidden"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+    const API = window.HS_API;
+    const map = L.map('map').setView([20.5937,78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    let control = null;
+
+    async function geocode(q){
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q));
+      const j = await r.json();
+      if (!j || !j.length) throw new Error('Not found: ' + q);
+      return [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+    }
+
+    document.getElementById('routeBtn').addEventListener('click', async () => {
+      const start = document.getElementById('start').value.trim();
+      const end = document.getElementById('end').value.trim();
+      if (!start || !end) return alert('Enter start and end');
+      try {
+        const s = await geocode(start);
+        const e = await geocode(end);
+        if (control) map.removeControl(control);
+        control = L.Routing.control({ waypoints: [L.latLng(s[0], s[1]), L.latLng(e[0], e[1])], routeWhileDragging:false, showAlternatives:true }).addTo(map);
+        control.on('routesfound', async function(ev){
+          const route = ev.routes[0];
+          const distanceKm = route.summary.totalDistance / 1000;
+          const waypoints = [ [s[0], s[1]], [ (s[0]+e[0])/2, (s[1]+e[1])/2 ], [e[0], e[1] ] ];
+          const metricsRes = await fetch(API + '/api/route-metrics', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ waypoints, samplesPerSegment:6 }) });
+          const metricsJson = await metricsRes.json();
+          const agg = metricsJson.aggregated;
+          document.getElementById('routeSummary').innerHTML = `
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="font-weight:800;font-size:18px">Safe score: ${agg.score}%</div>
+              <div class="metric-pill">Lighting: ${agg.lighting}%</div>
+              <div class="metric-pill">Crime: ${agg.crimePercent}%</div>
+              <div class="metric-pill">Crowd: ${agg.crowdPercent}%</div>
+              <div style="margin-left:auto;color:var(--muted)">${distanceKm.toFixed(1)} km</div>
+            </div>
+            <div style="margin-top:8px;color:var(--muted)">Tap any point on the route to view point metrics</div>
+          `;
+          if (metricsJson.points && metricsJson.points.length) {
+            metricsJson.points.forEach(p => {
+              const m = L.circleMarker([p.lat,p.lng], { radius:6, color:'#6dd3ff', fillColor:'#6dd3ff', fillOpacity:0.9 }).addTo(map);
+              m.bindPopup(`<strong>Point metrics</strong><br/>Safe: ${p.score}%<br/>Lighting: ${p.lighting}%<br/>Crime: ${p.crimePercent}%<br/>Crowd: ${p.crowdPercent}%`);
+            });
+          }
+        });
+      } catch (err) { alert('Route error: ' + err.message); }
+    });
+  </script>
+</body>
+</html>

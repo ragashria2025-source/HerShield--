@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Home</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Montserrat:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar" role="banner">
+    <div class="brand-center" aria-hidden="false">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+
+    <nav class="topnav" aria-label="Main navigation">
+      <a href="home.html">Home</a>
+      <a href="sos.html">SOS</a>
+      <a href="unsafe.html">Check‑in (AI)</a>
+      <a href="safe-route.html">Safe Route</a>
+      <a href="patrol.html">Patrol</a>
+      <a href="volunteer.html">Volunteer</a>
+      <a href="shops.html">Shops</a>
+      <a href="homes.html">Homes</a>
+      <a href="drivers.html">Drivers</a>
+    </nav>
+
+    <div class="corner-time" id="liveTime" aria-hidden="true">--:--</div>
+  </header>
+
+  <main class="container" role="main">
+    <section class="card hero" aria-labelledby="hero-heading">
+      <div class="hero-left">
+        <h2 id="hero-heading" class="hero-heading">One‑tap safety, community support</h2>
+        <p class="lead muted">Quick SOS, guided check‑in, safe route planning, live patrols and volunteers — all in one place.</p>
+
+        <div class="cta-grid" role="group" aria-label="Primary actions">
+          <button id="sosBtn" class="cta danger" aria-label="Send SOS">SOS</button>
+          <button id="unsafeBtn" class="cta warn" aria-label="Feeling unsafe">Feeling Unsafe</button>
+          <button id="safeBtn" class="cta safe" aria-label="Find safe route">Safe Route</button>
+        </div>
+
+        <div class="info-row" style="margin-top:14px">
+          <!-- clickable info blocks: accessible as buttons -->
+          <div id="volCard" class="info-block info-click" role="button" tabindex="0" aria-pressed="false" aria-label="Volunteers Nearby. 10 available.">
+            <div class="info-title">Volunteers Nearby</div>
+            <div id="volCount" class="info-value">10</div>
+            <div class="info-sub muted">Tap to view volunteers</div>
+          </div>
+
+          <div id="shopCard" class="info-block info-click" role="button" tabindex="0" aria-pressed="false" aria-label="Verified Shops. 10 available.">
+            <div class="info-title">Verified Shops</div>
+            <div id="shopCount" class="info-value">10</div>
+            <div class="info-sub muted">Tap to view shops</div>
+          </div>
+
+          <div id="driverCard" class="info-block info-click" role="button" tabindex="0" aria-pressed="false" aria-label="Top Drivers. 10 available.">
+            <div class="info-title">Top Drivers</div>
+            <div id="driverCount" class="info-value">10</div>
+            <div class="info-sub muted">Tap to view drivers</div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="hero-side" aria-label="Search and nearby">
+        <label class="label" for="searchLocation">Search location</label>
+        <input id="searchLocation" class="input" placeholder="Enter place or use current location" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="useMyLoc" class="btn" aria-label="Use my location">Use my location</button>
+          <button id="showNearby" class="btn primary" aria-label="Show nearby">Show</button>
+        </div>
+        <div id="nearbyResults" style="margin-top:12px" aria-live="polite"></div>
+      </aside>
+    </section>
+
+    <section class="card">
+      <h3>Quick access</h3>
+      <div class="quick-grid" role="navigation" aria-label="Quick links">
+        <a class="quick-card" href="volunteer.html" title="Volunteer sign up">
+          <div class="qc-title">Volunteer Sign Up</div>
+          <div class="qc-sub muted">Join the community</div>
+        </a>
+        <a class="quick-card" href="shops.html" title="Verified shops">
+          <div class="qc-title">Verified Shops</div>
+          <div class="qc-sub muted">Safe places nearby</div>
+        </a>
+        <a class="quick-card" href="homes.html" title="Verified homes">
+          <div class="qc-title">Verified Homes</div>
+          <div class="qc-sub muted">Short stay hosts</div>
+        </a>
+        <a class="quick-card" href="patrol.html" title="Police patrol">
+          <div class="qc-title">Police Patrol</div>
+          <div class="qc-sub muted">Live patrol map</div>
+        </a>
+        <a class="quick-card" href="drivers.html" title="Drivers">
+          <div class="qc-title">Drivers</div>
+          <div class="qc-sub muted">Book a ride</div>
+        </a>
+        <a class="quick-card" href="safe-route.html" title="Safe route">
+          <div class="qc-title">Safe Route</div>
+          <div class="qc-sub muted">Plan a safer path</div>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">HerShield Prototype • Demo only</footer>
+
+  <script src="main.js"></script>
+  <script>
+    // wire up primary CTAs
+    document.getElementById('sosBtn').addEventListener('click', () => location.href='sos.html');
+    document.getElementById('unsafeBtn').addEventListener('click', () => location.href='unsafe.html');
+    document.getElementById('safeBtn').addEventListener('click', () => location.href='safe-route.html');
+
+    // clickable info blocks: navigate to respective pages
+    const volCard = document.getElementById('volCard');
+    const shopCard = document.getElementById('shopCard');
+    const driverCard = document.getElementById('driverCard');
+
+    function makeClickable(el, href) {
+      if (!el) return;
+      el.addEventListener('click', () => location.href = href);
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); location.href = href; }
+      });
+      el.style.cursor = 'pointer';
+    }
+
+    makeClickable(volCard, 'volunteers.html');
+    makeClickable(shopCard, 'shops.html');
+    makeClickable(driverCard, 'drivers.html');
+
+    // ensure counts are refreshed from main.js helper
+    refreshCounts();
+  </script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Police Patrol</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav" aria-label="Main navigation"><a href="home.html">Home</a><a href="unsafe.html">Check‑in</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Police Patrol Map — Chennai</h2>
+      <p class="muted">Live patrol positions are pushed from the backend in real time.</p>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="refresh" class="btn primary">Refresh Patrols</button>
+        <button id="centerMe" class="btn">Center on my location</button>
+      </div>
+      <div id="map" style="height:560px;margin-top:12px;border-radius:12px;overflow:hidden"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+    startDynamicBackground();
+
+    const map = L.map('map').setView([13.0827,80.2707], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let markers = {};
+    function renderPatrols(list) {
+      // remove markers not in list
+      const ids = list.map(p => p.id);
+      Object.keys(markers).forEach(k => { if (!ids.includes(k)) { map.removeLayer(markers[k]); delete markers[k]; } });
+      list.forEach(p => {
+        if (markers[p.id]) {
+          markers[p.id].setLatLng([p.lat, p.lng]);
+          markers[p.id].setPopupContent(`<strong>${p.name}</strong><br/>${p.ts}`);
+        } else {
+          const m = L.circleMarker([p.lat,p.lng], { radius:7, color:'#ff3b6f', fillColor:'#ff3b6f', fillOpacity:0.95 }).addTo(map);
+          m.bindPopup(`<strong>${p.name}</strong><br/>${p.ts}`);
+          markers[p.id] = m;
+        }
+      });
+    }
+
+    // initial fetch (fallback)
+    async function loadLivePatrolsOnce(){
+      const res = await fetch(window.HS_API + '/api/patrols/live').then(r=>r.json()).catch(()=>[]);
+      renderPatrols(res);
+      if (res.length) map.setView([res[0].lat, res[0].lng], 13);
+    }
+
+    document.getElementById('refresh').addEventListener('click', loadLivePatrolsOnce);
+    document.getElementById('centerMe').addEventListener('click', async () => {
+      try { const pos = await getCurrentPosition(8000); map.setView([pos.lat, pos.lng], 14); L.circle([pos.lat, pos.lng], { radius: 80, color:'#6dd3ff', fillOpacity:0.06 }).addTo(map); } catch(e){ alert('Location not available'); }
+    });
+
+    // listen for socket updates
+    window.addEventListener('patrols:update', (ev) => {
+      const list = ev.detail || [];
+      renderPatrols(list);
+    });
+
+    // start with a one-time load
+    loadLivePatrolsOnce();
+  </script>
+</body>
+</html>

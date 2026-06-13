@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Sign up</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Montserrat:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <main class="center-screen">
+    <div class="card signup-card" role="form" aria-labelledby="signupTitle">
+      <!-- title and tagline styled for visibility inside the white card -->
+      <h1 id="signupTitle" class="brand-title in-card">HerShield <strong>AI+</strong></h1>
+      <div class="tagline in-card">Made for women, By women</div>
+
+      <p class="muted">Create a quick profile to personalize your experience. This is a demo; data is stored locally.</p>
+
+      <label class="field">
+        <span class="label">Full name</span>
+        <input id="name" class="input" type="text" autocomplete="name" required />
+      </label>
+
+      <div class="row">
+        <label class="field half">
+          <span class="label">Age</span>
+          <input id="age" class="input" type="number" min="13" required />
+        </label>
+        <label class="field half">
+          <span class="label">Phone</span>
+          <input id="phone" class="input" type="tel" inputmode="tel" required />
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="label">Location (city or use my location)</span>
+        <div style="display:flex;gap:8px">
+          <input id="location" class="input" type="text" placeholder="e.g., Chennai" />
+          <button id="useLocation" class="btn small" type="button">Use my location</button>
+        </div>
+      </label>
+
+      <label class="field">
+        <span class="label">Preferred pronouns (optional)</span>
+        <input id="pronouns" class="input" placeholder="she/her, they/them, etc." />
+      </label>
+
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+        <button id="signupBtn" class="btn primary large" type="button">Create account</button>
+        <div id="signupStatus" class="muted" aria-live="polite"></div>
+      </div>
+
+      <p class="muted small" style="margin-top:12px">By continuing you agree to the demo terms. This is a prototype — do not use for real emergencies.</p>
+    </div>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    // keep background animation but avoid showing any extra UI elements on signup
+    startDynamicBackground();
+
+    document.getElementById('useLocation').addEventListener('click', async () => {
+      try {
+        const pos = await getCurrentPosition(8000);
+        document.getElementById('location').value = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
+      } catch (e) {
+        alert('Location not available');
+      }
+    });
+
+    document.getElementById('signupBtn').addEventListener('click', async () => {
+      const name = document.getElementById('name').value.trim();
+      const age = parseInt(document.getElementById('age').value, 10);
+      const phone = document.getElementById('phone').value.trim();
+      const location = document.getElementById('location').value.trim();
+      const pronouns = document.getElementById('pronouns').value.trim();
+      const statusEl = document.getElementById('signupStatus');
+      const btn = document.getElementById('signupBtn');
+
+      if (!name || !age || !phone) {
+        statusEl.textContent = 'Please fill name, age and phone.';
+        return;
+      }
+
+      btn.disabled = true;
+      statusEl.textContent = 'Verifying...';
+
+      try {
+        await new Promise(r => setTimeout(r, 900));
+        const profile = { name, age, phone, location, pronouns, createdAt: new Date().toISOString() };
+        try { localStorage.setItem('hs_profile', JSON.stringify(profile)); } catch (e) { console.warn(e); }
+        statusEl.textContent = 'Account created ✓ Redirecting...';
+        setTimeout(() => window.location.assign('home.html'), 600);
+      } finally {
+        setTimeout(() => { btn.disabled = false; }, 2000);
+      }
+    });
+  </script>
+</body>
+</html>

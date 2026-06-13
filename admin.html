@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield Admin</div>
+      <div class="tagline">Manage volunteers, shops, homes, drivers</div>
+    </div>
+    <nav class="topnav" aria-label="Admin navigation"><a href="home.html">Home</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card" aria-labelledby="adminTitle">
+      <h2 id="adminTitle">Admin Dashboard (Demo)</h2>
+      <p class="muted">Use the demo admin token to login and create or verify entries.</p>
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="adminToken" class="input" placeholder="Admin token" />
+        <button id="adminLoginBtn" class="btn primary">Login</button>
+        <div id="adminStatus" class="muted" aria-live="polite"></div>
+      </div>
+
+      <hr style="margin:12px 0" />
+
+      <div id="adminPanel" style="display:none">
+        <h3>Create new item</h3>
+        <label class="field"><span class="label">Type</span>
+          <select id="createType" class="input">
+            <option value="volunteer">Volunteer</option>
+            <option value="shop">Shop</option>
+            <option value="home">Home</option>
+            <option value="driver">Driver</option>
+          </select>
+        </label>
+        <label class="field"><span class="label">Name</span><input id="createName" class="input" /></label>
+        <label class="field"><span class="label">Contact / Notes</span><input id="createContact" class="input" /></label>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="createBtn" class="btn primary">Create</button>
+          <button id="refreshAdmin" class="btn">Refresh list</button>
+        </div>
+
+        <h3 style="margin-top:18px">Existing items</h3>
+        <div id="adminLists" style="margin-top:8px"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+    startDynamicBackground();
+
+    const loginBtn = document.getElementById('adminLoginBtn');
+    const status = document.getElementById('adminStatus');
+    const panel = document.getElementById('adminPanel');
+
+    loginBtn.addEventListener('click', async () => {
+      const token = document.getElementById('adminToken').value.trim();
+      if (!token) { status.textContent = 'Enter token'; return; }
+      status.textContent = 'Logging in...';
+      const ok = await adminLogin(token);
+      if (ok) {
+        status.textContent = 'Logged in';
+        panel.style.display = 'block';
+        loadAdminLists();
+      } else {
+        status.textContent = 'Login failed';
+      }
+    });
+
+    document.getElementById('createBtn').addEventListener('click', async () => {
+      const type = document.getElementById('createType').value;
+      const name = document.getElementById('createName').value.trim();
+      const contact = document.getElementById('createContact').value.trim();
+      if (!name) return alert('Name required');
+      const data = { name, contact, verified: true };
+      const res = await adminCreate(type, data);
+      if (res.ok) {
+        toast('Created');
+        loadAdminLists();
+      } else alert('Create failed');
+    });
+
+    document.getElementById('refreshAdmin').addEventListener('click', loadAdminLists);
+
+    async function loadAdminLists() {
+      const token = localStorage.getItem('hs_admin_token');
+      if (!token) return;
+      const res = await fetch(window.HS_API + '/api/admin/list?token=' + encodeURIComponent(token)).then(r=>r.json()).catch(()=>null);
+      if (!res) return;
+      const container = document.getElementById('adminLists');
+      container.innerHTML = `
+        <h4>Volunteers (${res.volunteers.length})</h4>
+        ${res.volunteers.map(v => `<div class="mini"><strong>${v.name}</strong> • ${v.contact||''} <button onclick="openAdminEdit('volunteer','${v.id}')">Edit</button></div>`).join('')}
+        <h4>Shops (${res.shops.length})</h4>
+        ${res.shops.map(s => `<div class="mini"><strong>${s.name}</strong> • ${s.contact||''} <button onclick="openAdminEdit('shop','${s.id}')">Edit</button></div>`).join('')}
+        <h4>Homes (${res.homes.length})</h4>
+        ${res.homes.map(h => `<div class="mini"><strong>${h.name}</strong> • ${h.contact||''} <button onclick="openAdminEdit('home','${h.id}')">Edit</button></div>`).join('')}
+        <h4>Drivers (${res.drivers.length})</h4>
+        ${res.drivers.map(d => `<div class="mini"><strong>${d.name}</strong> • ${d.platform||''} <button onclick="openAdminEdit('driver','${d.id}')">Edit</button></div>`).join('')}
+      `;
+    }
+
+    window.openAdminEdit = async function(type, id) {
+      const token = localStorage.getItem('hs_admin_token');
+      if (!token) return alert('Not logged in');
+      // fetch item from API endpoints
+      let item = null;
+      if (type === 'volunteer') item = await fetch(window.HS_API + '/api/volunteers/' + id).then(r=>r.json()).catch(()=>null);
+      if (type === 'shop') item = await fetch(window.HS_API + '/api/shops/' + id).then(r=>r.json()).catch(()=>null);
+      if (type === 'home') item = await fetch(window.HS_API + '/api/homes/' + id).then(r=>r.json()).catch(()=>null);
+      if (type === 'driver') item = await fetch(window.HS_API + '/api/drivers/' + id).then(r=>r.json()).catch(()=>null);
+      if (!item) return alert('Item not found');
+      const html = `<h3>Edit ${type}</h3>
+        <label class="field"><span class="label">Name</span><input id="editName" class="input" value="${item.name || ''}" /></label>
+        <label class="field"><span class="label">Contact</span><input id="editContact" class="input" value="${item.contact || item.platform || ''}" /></label>
+        <label class="field"><span class="label">Verified</span><select id="editVerified" class="input"><option value="true">true</option><option value="false">false</option></select></label>
+        <div style="display:flex;gap:8px;margin-top:8px"><button id="saveEdit" class="btn primary">Save</button></div>`;
+      openModal(html);
+      document.getElementById('editVerified').value = item.verified ? 'true' : 'false';
+      document.getElementById('saveEdit').addEventListener('click', async () => {
+        const data = { name: document.getElementById('editName').value.trim(), contact: document.getElementById('editContact').value.trim(), verified: document.getElementById('editVerified').value === 'true' };
+        const res = await adminUpdate(type, id, data);
+        if (res.ok) {
+          toast('Updated');
+          document.querySelector('.modal-backdrop').remove();
+          loadAdminLists();
+        } else alert('Update failed');
+      });
+    };
+  </script>
+</body>
+</html>

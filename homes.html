@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Verified Homes</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav"><a href="home.html">Home</a><a href="sos.html">SOS</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Verified Homes</h2>
+      <p class="muted">Homes and short-stay hosts verified by the community. Tap to view profile.</p>
+
+      <div id="homesList" style="margin-top:12px"></div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+
+    async function loadHomes(){
+      const homes = await fetch(window.HS_API + '/api/homes').then(r=>r.json()).catch(()=>[]);
+      const el = document.getElementById('homesList');
+      if (!homes.length) return el.innerHTML = '<div class="muted">No homes available</div>';
+      sessionStorage.setItem('hs_homes', JSON.stringify(homes));
+      el.innerHTML = homes.map(h => `
+        <div class="card mini" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700">${h.name} ${h.verified ? '✅' : ''}</div>
+            <div class="muted">${h.address || ''}</div>
+            <div class="muted">Contact: ${h.contact || '—'}</div>
+          </div>
+          <div style="text-align:right">
+            <button class="btn" onclick="alert('Contacting host (mock)')">Contact</button>
+            <button class="btn" onclick="showHomeProfile('${h.id}')">Profile</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    loadHomes();
+  </script>
+</body>
+</html>

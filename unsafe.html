@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — AI Chat</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav" aria-label="Main navigation">
+      <a href="home.html">Home</a>
+      <a href="sos.html">SOS</a>
+      <a href="safe-route.html">Safe Route</a>
+    </nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card chat-card" aria-labelledby="chatTitle">
+      <h2 id="chatTitle">HerShield AI — Chat</h2>
+      <div class="muted">Talk naturally. The assistant will ask follow‑ups, suggest actions, and can escalate if needed.</div>
+
+      <div id="chatWindow" class="chat-window" role="log" aria-live="polite"></div>
+
+      <div class="chat-controls" style="display:flex;gap:8px;margin-top:8px">
+        <input id="chatInput" class="input" placeholder="Type a message or choose a suggestion..." aria-label="Message" />
+        <button id="sendBtn" class="btn primary">Send</button>
+      </div>
+
+      <div id="quickReplies" class="quick-replies" aria-hidden="false" style="margin-top:8px"></div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+    startDynamicBackground();
+
+    const chatWindow = document.getElementById('chatWindow');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const quickReplies = document.getElementById('quickReplies');
+
+    let sessionId = localStorage.getItem('hs_ai_session') || null;
+    if (!sessionId) {
+      sessionId = 's' + (Date.now() + Math.floor(Math.random()*1000));
+      localStorage.setItem('hs_ai_session', sessionId);
+    }
+
+    const conversation = []; // local copy of answers
+
+    function appendMessage(who, text, meta = '') {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble ' + (who === 'user' ? 'bubble-user' : 'bubble-ai');
+      bubble.innerHTML = `<div class="bubble-text">${escapeHtml(text)}</div>${meta ? `<div class="bubble-meta">${escapeHtml(meta)}</div>` : ''}`;
+      chatWindow.appendChild(bubble);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    async function sendUserMessage(text) {
+      if (!text) return;
+      appendMessage('user', text);
+      chatInput.value = '';
+      conversation.push({ questionId: 'free', answer: text });
+      await callAiBackend();
+    }
+
+    async function callAiBackend() {
+      appendMessage('ai', 'Thinking…');
+      try {
+        const res = await fetch(window.HS_API + '/api/ai/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: conversation, context: {}, sessionId })
+        });
+        const j = await res.json();
+        if (j.sessionId) {
+          sessionId = j.sessionId;
+          localStorage.setItem('hs_ai_session', sessionId);
+        }
+        const last = chatWindow.querySelector('.bubble-ai:last-child');
+        if (last && last.textContent.includes('Thinking')) last.remove();
+
+        if (j.action) {
+          appendMessage('ai', j.action.message || 'Suggested action', j.action.type || '');
+          if (j.action.type === 'suggest_sos' || j.action.type === 'escalate') {
+            quickReplies.innerHTML = `<button class="pill" onclick="location.href='sos.html'">Send SOS</button><button class="pill" onclick="notifyContact()">Notify contact</button>`;
+          }
+        }
+
+        if (j.next) {
+          appendMessage('ai', j.next.text || 'Follow up question');
+          quickReplies.innerHTML = '';
+          (j.next.options || []).slice(0,6).forEach(opt => {
+            const b = document.createElement('button');
+            b.className = 'pill';
+            b.textContent = opt;
+            b.onclick = () => { appendMessage('user', opt); conversation.push({ questionId: j.next.id || 'q', answer: opt }); callAiBackend(); quickReplies.innerHTML = ''; };
+            quickReplies.appendChild(b);
+          });
+        } else if (!j.next && !j.action) {
+          appendMessage('ai', 'Thanks — check‑in complete. I can suggest resources, volunteers, or safe routes if you want.');
+          quickReplies.innerHTML = `<button class="pill" onclick="showResources()">Show resources</button><button class="pill" onclick="location.href='volunteer.html'">Volunteer help</button>`;
+        }
+      } catch (err) {
+        console.error(err);
+        appendMessage('ai', 'Sorry, something went wrong. Try again.');
+      }
+    }
+
+    function notifyContact(){ alert('Notify contact (mock)'); }
+    function showResources(){ alert('Resources (mock)'); }
+
+    sendBtn.addEventListener('click', () => sendUserMessage(chatInput.value.trim()));
+    chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendUserMessage(chatInput.value.trim()); } });
+
+    // varied friendly openers and suggestions
+    const openers = [
+      'Hi — I am HerShield. What happened, in your words?',
+      'Hello — tell me briefly what you’re experiencing and I’ll help.',
+      'I’m here. Describe what’s going on or tap a suggestion to start.',
+      'If you feel unsafe, say so. I can suggest actions and contacts.',
+      'Tell me where you are and what you need — I’ll guide you.'
+    ];
+    const suggestions = [
+      'I feel unsafe',
+      'I need a safe route',
+      'Someone is following me',
+      'I want to notify a contact',
+      'I want to record evidence',
+      'I need a volunteer nearby'
+    ];
+
+    setTimeout(() => {
+      const opener = openers[Math.floor(Math.random()*openers.length)];
+      appendMessage('ai', opener);
+      quickReplies.innerHTML = '';
+      const shuffled = suggestions.sort(() => 0.5 - Math.random()).slice(0,3);
+      shuffled.forEach(s => {
+        const b = document.createElement('button');
+        b.className = 'pill';
+        b.textContent = s;
+        b.onclick = () => sendUserMessage(s);
+        quickReplies.appendChild(b);
+      });
+    }, 300);
+  </script>
+</body>
+</html>

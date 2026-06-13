@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Travel</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+</head>
+<body>
+  <header><h1>Travel Planner</h1><nav><a href="index.html">Home</a></nav></header>
+  <main>
+    <section class="card">
+      <label>Start: <input id="start" placeholder="e.g., New Delhi" /></label>
+      <label>End: <input id="end" placeholder="e.g., Gurgaon" /></label>
+      <button id="routeBtn">Show Route & Safe Score</button>
+      <div id="score" style="margin-top:8px;font-weight:bold"></div>
+    </section>
+
+    <section id="mapCard" class="card">
+      <div id="map" style="height:420px"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <script src="main.js"></script>
+  <script>
+    const API = window.HS_API;
+    let map = L.map('map').setView([20.5937,78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    let control = null;
+
+    document.getElementById('routeBtn').addEventListener('click', async () => {
+      const start = document.getElementById('start').value.trim();
+      const end = document.getElementById('end').value.trim();
+      if (!start || !end) return alert('Enter start and end');
+
+      // Use Nominatim to geocode (public)
+      const geocode = async q => {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q));
+        const j = await r.json();
+        if (!j || !j.length) throw new Error('Not found: ' + q);
+        return [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+      };
+
+      try {
+        const s = await geocode(start);
+        const e = await geocode(end);
+
+        if (control) map.removeControl(control);
+        control = L.Routing.control({
+          waypoints: [L.latLng(s[0], s[1]), L.latLng(e[0], e[1])],
+          routeWhileDragging: false,
+          showAlternatives: true,
+          fitSelectedRoute: true
+        }).addTo(map);
+
+        // compute mock safe score: base 100 minus (distance_km * 2) minus alertsNearby*5
+        control.on('routesfound', async function(e){
+          const route = e.routes[0];
+          const distanceKm = route.summary.totalDistance / 1000;
+          // fetch alerts from backend and count those within bounding box
+          const alerts = await fetch(API + '/api/alerts').then(r => r.json()).catch(()=>[]);
+          // simple bounding box
+          const bounds = route.bounds;
+          const alertsNearby = alerts.filter(a => a.location && a.location.lat && a.location.lng && bounds.contains([a.location.lat, a.location.lng])).length;
+          let score = Math.max(10, Math.round(100 - distanceKm * 2 - alertsNearby * 8));
+          document.getElementById('score').textContent = `Safe score: ${score} / 100 (distance ${distanceKm.toFixed(1)} km, ${alertsNearby} nearby alerts)`;
+        });
+
+      } catch (err) {
+        alert('Route error: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

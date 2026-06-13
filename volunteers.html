@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Volunteers</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav"><a href="home.html">Home</a><a href="sos.html">SOS</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Volunteers Nearby</h2>
+      <p class="muted">Community volunteers who signed up to help. View profile or contact (mock).</p>
+
+      <div id="volList" style="margin-top:12px"></div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+
+    async function loadVols(){
+      const vols = await fetch(window.HS_API + '/api/volunteers').then(r=>r.json()).catch(()=>[]);
+      const el = document.getElementById('volList');
+      if (!vols.length) return el.innerHTML = '<div class="muted">No volunteers yet</div>';
+      sessionStorage.setItem('hs_vols', JSON.stringify(vols));
+      el.innerHTML = vols.map(v => `
+        <div class="card mini" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700">${v.name} • ${v.age || '—'}</div>
+            <div class="muted">${v.address || ''}</div>
+            <div class="muted">Skills: ${v.skills?.join(', ') || '—'}</div>
+          </div>
+          <div style="text-align:right">
+            <button class="btn" onclick="alert('Contacting volunteer (mock)')">Contact</button>
+            <button class="btn" onclick="showVolunteerProfile('${v.id}')">Profile</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    loadVols();
+  </script>
+</body>
+</html>

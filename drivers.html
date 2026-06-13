@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Recommended Drivers</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav"><a href="home.html">Home</a><a href="sos.html">SOS</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Recommended Drivers</h2>
+      <p class="muted">Drivers recommended based on female-friendly ratings and feedback. Book or view profile (mock).</p>
+
+      <div id="driverList" style="margin-top:12px"></div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+
+    async function loadDrivers(){
+      const drivers = await fetch(window.HS_API + '/api/drivers').then(r=>r.json()).catch(()=>[]);
+      const el = document.getElementById('driverList');
+      if (!drivers.length) return el.innerHTML = '<div class="muted">No drivers available</div>';
+      const enriched = drivers.map(d => ({ ...d, platform: d.platform || (d.id==='d1' ? 'Ola' : d.id==='d2' ? 'Uber' : 'Rapido') }));
+      sessionStorage.setItem('hs_drivers', JSON.stringify(enriched));
+      el.innerHTML = enriched.map(d => `
+        <div class="card mini" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700">${d.name} • ${d.rating}★</div>
+            <div class="muted">${d.platform || '—'} • ${d.feedbackCount || 0} feedbacks</div>
+            <div class="muted">Female friendly: ${d.femaleFriendly ? 'Yes' : 'No'}</div>
+          </div>
+          <div style="text-align:right">
+            <button class="btn" onclick="bookDriver('${d.id}')">Book</button>
+            <button class="btn" onclick="showDriverProfile('${d.id}')">Profile</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    loadDrivers();
+  </script>
+</body>
+</html>

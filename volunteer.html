@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — Volunteer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav"><a href="home.html">Home</a><a href="sos.html">SOS</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Volunteer Registration</h2>
+      <p class="muted">Sign up to help your community. We ask a few details to match you with requests.</p>
+
+      <form id="volForm" onsubmit="return false;" style="margin-top:12px">
+        <label class="field"><span class="label">Name</span><input id="vName" class="input" required /></label>
+        <label class="field"><span class="label">Age</span><input id="vAge" class="input" type="number" min="18" /></label>
+        <label class="field"><span class="label">Phone or Email</span><input id="vContact" class="input" required /></label>
+        <label class="field"><span class="label">Address</span><input id="vAddress" class="input" /></label>
+        <label class="field"><span class="label">DOB</span><input id="vDob" class="input" type="date" /></label>
+        <label class="field"><span class="label">Skills (comma separated)</span><input id="vSkills" class="input" placeholder="first aid, driving, counseling" /></label>
+        <label class="field"><span class="label">Availability</span><input id="vAvail" class="input" placeholder="mornings, evenings, nights" /></label>
+
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button id="registerVol" class="btn primary">Register</button>
+          <button id="showVol" class="btn">Show Live Volunteers</button>
+        </div>
+      </form>
+
+      <div id="volList" style="margin-top:14px"></div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+
+    document.getElementById('registerVol').addEventListener('click', async () => {
+      const name = document.getElementById('vName').value.trim();
+      const age = parseInt(document.getElementById('vAge').value,10);
+      const contact = document.getElementById('vContact').value.trim();
+      const address = document.getElementById('vAddress').value.trim();
+      const dob = document.getElementById('vDob').value;
+      const skills = document.getElementById('vSkills').value.split(',').map(s=>s.trim()).filter(Boolean);
+      const availability = document.getElementById('vAvail').value.trim();
+      if (!name || !contact) return alert('Name and contact required');
+      const payload = { name, age, contact, address, dob, skills, availability, createdAt: new Date().toISOString() };
+      await fetch(window.HS_API + '/api/volunteers', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      toast('Registered as volunteer (mock).');
+      document.getElementById('volForm').reset();
+      refreshCounts();
+    });
+
+    document.getElementById('showVol').addEventListener('click', async () => {
+      const res = await fetch(window.HS_API + '/api/volunteers').then(r=>r.json()).catch(()=>[]);
+      const el = document.getElementById('volList');
+      el.innerHTML = res.length ? res.map(v=>`<div class="mini"><strong>${v.name}</strong> • ${v.skills?.join(', ')||'—'} • ${v.contact||'—'} <button onclick="showVolunteerProfile('${v.id}')">Profile</button></div>`).join('') : '<div class="muted">No volunteers yet</div>';
+    });
+  </script>
+</body>
+</html>

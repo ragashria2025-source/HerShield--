@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HerShield — SOS</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand-center">
+      <div class="brand-title">HerShield <strong>AI+</strong></div>
+      <div class="tagline">Made for women, By women</div>
+    </div>
+    <nav class="topnav" aria-label="Main navigation"><a href="home.html">Home</a><a href="unsafe.html">Check‑in</a></nav>
+    <div class="corner-time" id="headerTime">--:--</div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>One‑tap SOS</h2>
+      <p class="muted">This will send an SOS and collect GPS, short video and voice evidence (consent required).</p>
+
+      <div style="margin-top:18px">
+        <button id="sendSos" class="cta danger">Send SOS</button>
+      </div>
+
+      <div id="status" class="status" style="margin-top:12px"></div>
+
+      <div id="evidenceControls" style="display:none;margin-top:12px">
+        <video id="preview" controls style="max-width:100%;display:block;margin-top:8px"></video>
+        <audio id="audioPreview" controls style="display:block;margin-top:8px"></audio>
+        <div id="evidenceMeta" class="evidence-meta"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="main.js"></script>
+  <script>
+    startClock('headerTime');
+
+    const sendBtn = document.getElementById('sendSos');
+    const statusEl = document.getElementById('status');
+    const evidenceControls = document.getElementById('evidenceControls');
+    const previewVideo = document.getElementById('preview');
+    const audioPreview = document.getElementById('audioPreview');
+    const evidenceMeta = document.getElementById('evidenceMeta');
+
+    sendBtn.addEventListener('click', async () => {
+      if (!confirm('Send SOS now? This will attempt to collect GPS, video and voice evidence.')) return;
+      sendBtn.disabled = true;
+      statusEl.textContent = 'Preparing SOS...';
+      try {
+        const loc = await getCurrentPosition(10000).catch(()=>null);
+        statusEl.textContent = loc ? 'GPS captured' : 'GPS unavailable';
+        const media = await captureShortMedia(5000, 3000).catch(()=>null);
+        if (media) {
+          evidenceControls.style.display = 'block';
+          previewVideo.src = media.videoUrl || '';
+          audioPreview.src = media.audioUrl || '';
+          const ts = new Date().toISOString();
+          evidenceMeta.innerHTML = `Evidence recorded at <strong>${ts}</strong>`;
+        } else {
+          evidenceMeta.innerHTML = '';
+        }
+        const payload = { type:'SOS', note:'SOS from prototype', location: loc, anonymous:false };
+        const res = await fetch(window.HS_API + '/api/alerts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const alertJson = await res.json();
+        statusEl.textContent = 'SOS sent ✓';
+        toast('SOS sent. Trusted contacts notified (mock).');
+        if (media && (media.videoBlob || media.audioBlob)) {
+          const form = new FormData();
+          if (media.videoBlob) form.append('file', media.videoBlob, 'evidence-video.webm');
+          if (media.audioBlob) form.append('file', media.audioBlob, 'evidence-audio.webm');
+          const up = await fetch(window.HS_API + '/api/evidence', { method:'POST', body: form });
+          const upj = await up.json();
+          if (upj.item && upj.item.createdAt) {
+            evidenceMeta.innerHTML += `<div class="evidence-meta">Uploaded at <strong>${upj.item.createdAt}</strong></div>`;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Failed to send SOS. Saved locally.';
+        enqueueOffline({ type:'alert', payload: { type:'SOS', note:'offline SOS' } });
+      } finally { sendBtn.disabled = false; }
+    });
+  </script>
+</body>
+</html>
