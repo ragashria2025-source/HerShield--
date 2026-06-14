@@ -361,3 +361,9 @@ app.get('/', (req,res) => res.send('HerShield backend running'));
 /* ---------- Start server ---------- */
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+
+app.use(express.static("frontend"));
+app.get("*", (req,res)=>{
+  res.sendFile(path.join(__dirname,"frontend","index.html"));
+});
+
