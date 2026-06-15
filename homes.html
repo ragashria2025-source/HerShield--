@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>HerShield — Verified Homes</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* small local styles for the homes page */
+    .card.mini { display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;margin-bottom:10px; }
+    .card.mini .left { max-width:72%; }
+    .card.mini .left .name { font-weight:700; margin-bottom:6px; }
+    .card.mini .left .meta { color: #666; font-size:0.95rem; margin-bottom:4px; }
+    .card.mini .actions { display:flex;flex-direction:column;gap:8px;align-items:flex-end }
+    .btn { padding:8px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.06); background:#fff; cursor:pointer }
+    .btn.primary { background: linear-gradient(90deg,#ffd966,#d4af37); border:none; font-weight:700 }
+    .verified-badge { color:#2e7d32; font-weight:800; margin-left:6px }
+    .muted { color:#666 }
+    .sr-only { position:absolute; left:-9999px; }
+  </style>
 </head>
 <body class="app">
   <header class="topbar">
@@ -17,39 +30,110 @@
   </header>
 
   <main class="container">
-    <section class="card">
-      <h2>Verified Homes</h2>
-      <p class="muted">Homes and short-stay hosts verified by the community. Tap to view profile.</p>
+    <section class="card" aria-labelledby="homesTitle">
+      <h2 id="homesTitle">Verified Homes</h2>
+      <p class="muted">Homes and short-stay hosts verified by the community. Tap to view profile or contact the host.</p>
 
       <div id="homesList" style="margin-top:12px"></div>
     </section>
   </main>
 
-  <script src="main.js"></script>
   <script>
+    // small clock helper (if you already have one in main.js this is safe)
+    function startClock(id){
+      const el = document.getElementById(id);
+      if(!el) return;
+      function tick(){ const d = new Date(); el.textContent = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+      tick(); setInterval(tick, 60*1000);
+    }
     startClock('headerTime');
 
-    async function loadHomes(){
-      const homes = await fetch(window.HS_API + '/api/homes').then(r=>r.json()).catch(()=>[]);
+    // ---------- Frontend-only sample data (10+ homes) ----------
+    const SAMPLE_HOMES = [
+      { id: "H001", name: "Community Shelter Salem", verified: true, address: "12 Rose Street, Salem", contact: "+91 90000 10001", notes: "24/7 staff, women-only rooms" },
+      { id: "H002", name: "SafeStay Residency", verified: true, address: "45 Lakeview Ave, Salem", contact: "+91 90000 10002", notes: "Short-stay, CCTV, female host" },
+      { id: "H003", name: "Harbor Guest House", verified: true, address: "8 Market Road, Salem", contact: "+91 90000 10003", notes: "Verified by local volunteers" },
+      { id: "H004", name: "Lotus Women Hostel", verified: true, address: "22 Green Park, Salem", contact: "+91 90000 10004", notes: "Secure entry, emergency contact" },
+      { id: "H005", name: "Sunrise Short Stay", verified: true, address: "101 Hill Lane, Salem", contact: "+91 90000 10005", notes: "Near bus stop, friendly host" },
+      { id: "H006", name: "Harbor Guest House", verified: true, address: "8 Market Road, Salem", contact: "+91 90000 10003", notes: "Duplicate entry (same as H003) for testing" },
+      { id: "H007", name: "SafeStay Residency", verified: true, address: "45 Lakeview Ave, Salem", contact: "+91 90000 10002", notes: "Duplicate entry (same as H002) for testing" },
+      { id: "H008", name: "Community Shelter Salem", verified: true, address: "12 Rose Street, Salem", contact: "+91 90000 10001", notes: "Duplicate entry (same as H001) for testing" },
+      { id: "H009", name: "Evening Rest Home", verified: false, address: "7 Riverbend, Salem", contact: "+91 90000 10006", notes: "Pending verification" },
+      { id: "H010", name: "Women’s Transit Hub", verified: true, address: "3 Central Plaza, Salem", contact: "+91 90000 10007", notes: "Volunteer-run, daytime only" },
+      { id: "H011", name: "Lotus Women Hostel", verified: true, address: "22 Green Park, Salem", contact: "+91 90000 10004", notes: "Duplicate entry (same as H004) for testing" },
+      { id: "H012", name: "Safe Corner Stay", verified: true, address: "66 Oak Street, Salem", contact: "+91 90000 10008", notes: "Verified host, first-aid kit available" }
+    ];
+
+    // ---------- Render homes (frontend only) ----------
+    function renderHomes(homes){
       const el = document.getElementById('homesList');
-      if (!homes.length) return el.innerHTML = '<div class="muted">No homes available</div>';
+      if(!el) return;
+      if(!homes || homes.length === 0){
+        el.innerHTML = '<div class="muted">No homes available</div>';
+        return;
+      }
+
+      // store in session for quick access (optional)
       sessionStorage.setItem('hs_homes', JSON.stringify(homes));
-      el.innerHTML = homes.map(h => `
-        <div class="card mini" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700">${h.name} ${h.verified ? '✅' : ''}</div>
-            <div class="muted">${h.address || ''}</div>
-            <div class="muted">Contact: ${h.contact || '—'}</div>
+
+      // build HTML
+      el.innerHTML = homes.map(h => {
+        const verifiedBadge = h.verified ? '<span class="verified-badge" aria-hidden="true">✅ Verified</span>' : '<span class="muted" aria-hidden="true">• Not verified</span>';
+        // escape minimal fields to avoid injection
+        const name = String(h.name || '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const addr = String(h.address || '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const contact = String(h.contact || '—').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const notes = String(h.notes || '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        return `
+          <div class="card mini" role="article" aria-labelledby="home-${h.id}">
+            <div class="left">
+              <div id="home-${h.id}" class="name">${name} ${h.verified ? '<span class="verified-badge">✅</span>' : ''}</div>
+              <div class="meta muted">${addr}</div>
+              <div class="meta muted">Contact: ${contact}</div>
+              <div class="meta muted" style="margin-top:6px">${notes}</div>
+            </div>
+            <div class="actions" aria-hidden="false">
+              <button class="btn primary" onclick="contactHost('${h.id}')">Contact</button>
+              <button class="btn" onclick="showHomeProfile('${h.id}')">Profile</button>
+            </div>
           </div>
-          <div style="text-align:right">
-            <button class="btn" onclick="alert('Contacting host (mock)')">Contact</button>
-            <button class="btn" onclick="showHomeProfile('${h.id}')">Profile</button>
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
-    loadHomes();
+    // ---------- Actions ----------
+    function contactHost(id){
+      const homes = JSON.parse(sessionStorage.getItem('hs_homes') || '[]');
+      const h = homes.find(x => x.id === id) || SAMPLE_HOMES.find(x => x.id === id);
+      if(!h) return alert('Host not found');
+      // mock contact flow: show contact details and copy option
+      const msg = `Contact ${h.name}\nPhone: ${h.contact}\nAddress: ${h.address}\n\nThis is a mock contact action in the demo.`;
+      // show a friendly modal-like alert (replace with real UI in production)
+      alert(msg);
+    }
+
+    function showHomeProfile(id){
+      const homes = JSON.parse(sessionStorage.getItem('hs_homes') || '[]');
+      const h = homes.find(x => x.id === id) || SAMPLE_HOMES.find(x => x.id === id);
+      if(!h) return alert('Home not found');
+      // simple profile view (replace with a modal or dedicated page in production)
+      const profile = [
+        `Name: ${h.name}`,
+        `Verified: ${h.verified ? 'Yes' : 'No'}`,
+        `Address: ${h.address}`,
+        `Contact: ${h.contact}`,
+        `Notes: ${h.notes || '—'}`,
+        '',
+        'This profile is a frontend demo. For real deployments, connect to a secure backend and verification workflow.'
+      ].join('\n');
+      alert(profile);
+    }
+
+    // ---------- Initialize page with frontend data ----------
+    (function init(){
+      // Use SAMPLE_HOMES directly; you can shuffle or duplicate as needed
+      renderHomes(SAMPLE_HOMES);
+    })();
   </script>
 </body>
 </html>
