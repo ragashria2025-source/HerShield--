@@ -437,4 +437,23 @@ try {
   // initialize socket.io for pages that want real-time updates
   initSocketIo();
 } catch (e) { /* ignore */ }
+function updateCounts(){
+  const vols = load(STORAGE_KEYS.VOLUNTEERS, []);
+  const drivers = load(STORAGE_KEYS.DRIVERS, []);
+  const shops = load(STORAGE_KEYS.SHOPS, []);
+  const volEl = document.getElementById("volCount");
+  const drvEl = document.getElementById("drvCount");
+  const shopEl = document.getElementById("shopCount");
+  if(volEl) volEl.textContent = vols.length;
+  if(drvEl) drvEl.textContent = drivers.length;
+  if(shopEl) shopEl.textContent = shops.length;
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  seedData();
+  renderHeader();
+  updateCounts();
+  // … other init functions
+});
+
 
