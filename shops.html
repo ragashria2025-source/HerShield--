@@ -5,51 +5,228 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>HerShield — Verified Shops</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    :root{
+      --card-bg:#fff;
+      --muted:#666;
+      --accent:#1976d2;
+      --radius:12px;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;color:#111;background:linear-gradient(135deg,#3b0f6f,#8b2be2);-webkit-font-smoothing:antialiased}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;color:#fff}
+    .brand-title{font-weight:700;font-size:1.05rem}
+    .tagline{font-size:0.85rem;opacity:0.95}
+    .topnav a{color:rgba(255,255,255,0.95);margin-left:12px;text-decoration:none;font-weight:600}
+    .container{max-width:1100px;margin:20px auto;padding:12px}
+    .card{background:var(--card-bg);border-radius:var(--radius);padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.12)}
+    .muted{color:var(--muted)}
+    .shops-list{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+    .shop-card{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fafafa);border:1px solid rgba(0,0,0,0.04)}
+    .shop-left{max-width:70%}
+    .shop-name{font-weight:800;margin-bottom:6px}
+    .shop-meta{color:var(--muted);font-size:0.95rem;margin-bottom:4px}
+    .shop-actions{display:flex;gap:8px;flex-direction:column;align-items:flex-end}
+    .btn{padding:8px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:#fff;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,#ffd966,#d4af37);border:none;font-weight:700}
+    .verified-badge{font-weight:700;color:#2e7d32;margin-left:8px}
+    .sr-only{position:absolute;left:-9999px}
+    @media (max-width:720px){
+      .shop-card{flex-direction:column;align-items:flex-start}
+      .shop-actions{flex-direction:row;width:100%;justify-content:space-between;margin-top:8px}
+    }
+    /* small modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:10000}
+    .modal{background:#fff;padding:16px;border-radius:10px;max-width:520px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+    .modal h3{margin:0 0 8px 0}
+    .modal p{margin:6px 0}
+    .modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  </style>
 </head>
 <body class="app">
-  <header class="topbar">
-    <div class="brand-center">
+  <header class="topbar" role="banner">
+    <div>
       <div class="brand-title">HerShield <strong>AI+</strong></div>
-      <div class="tagline">Made for women, By women</div>
+      <div class="tagline">Made for women, by women</div>
     </div>
-    <nav class="topnav"><a href="home.html">Home</a><a href="sos.html">SOS</a></nav>
-    <div class="corner-time" id="headerTime">--:--</div>
+    <nav class="topnav" aria-label="Main navigation">
+      <a href="home.html">Home</a>
+      <a href="sos.html">SOS</a>
+    </nav>
+    <div id="headerTime" aria-hidden="true">--:--</div>
   </header>
 
-  <main class="container">
-    <section class="card">
-      <h2>Verified Shops</h2>
-      <p class="muted">Tap a shop to view profile or call (mock).</p>
+  <main class="container" role="main">
+    <section class="card" aria-labelledby="shopsTitle">
+      <h2 id="shopsTitle">Verified Shops</h2>
+      <p class="muted">Tap a shop to view profile or call (mock). All data is stored in the frontend for demo purposes.</p>
 
-      <div id="shopsList" style="margin-top:12px"></div>
+      <div id="shopsList" class="shops-list" aria-live="polite"></div>
     </section>
   </main>
 
-  <script src="main.js"></script>
+  <div id="modalRoot" aria-hidden="true"></div>
+
   <script>
+    // small clock helper
+    function startClock(id){
+      const el = document.getElementById(id);
+      if(!el) return;
+      function tick(){ const d = new Date(); el.textContent = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+      tick(); setInterval(tick, 60*1000);
+    }
     startClock('headerTime');
 
-    async function loadShops(){
-      const shops = await fetch(window.HS_API + '/api/shops').then(r=>r.json()).catch(()=>[]);
+    // ---------- Frontend-only sample shops (12 entries, duplicates included) ----------
+    const SAMPLE_SHOPS = [
+      { id: "S001", name: "SafeMart Grocery", verified: true, address: "12 Rose Street, Salem", contact: "+91 90000 30001", hours: "8:00–22:00", notes: "Well-lit entrance; staff trained for safety" },
+      { id: "S002", name: "NightCare Pharmacy", verified: true, address: "45 Lakeview Ave, Salem", contact: "+91 90000 30002", hours: "24 hours", notes: "24/7 pharmacy with CCTV" },
+      { id: "S003", name: "Bright Boutique", verified: true, address: "8 Market Road, Salem", contact: "+91 90000 30003", hours: "10:00–20:00", notes: "Female staff available; verified by volunteers" },
+      { id: "S004", name: "Corner Cafe", verified: true, address: "22 Green Park, Salem", contact: "+91 90000 30004", hours: "7:00–23:00", notes: "Safe seating area; emergency contact displayed" },
+      { id: "S005", name: "QuickFix Repairs", verified: true, address: "101 Hill Lane, Salem", contact: "+91 90000 30005", hours: "9:00–19:00", notes: "Trusted by local community" },
+      { id: "S006", name: "SafeMart Grocery", verified: true, address: "12 Rose Street, Salem", contact: "+91 90000 30001", hours: "8:00–22:00", notes: "Duplicate entry for testing" },
+      { id: "S007", name: "Bright Boutique", verified: true, address: "8 Market Road, Salem", contact: "+91 90000 30003", hours: "10:00–20:00", notes: "Duplicate entry for testing" },
+      { id: "S008", name: "WomenCare Salon", verified: true, address: "66 Oak Street, Salem", contact: "+91 90000 30006", hours: "10:00–21:00", notes: "Women-only hours available" },
+      { id: "S009", name: "Transit Convenience", verified: false, address: "7 Riverbend, Salem", contact: "+91 90000 30007", hours: "6:00–23:00", notes: "Pending verification" },
+      { id: "S010", name: "Community Corner Store", verified: true, address: "3 Central Plaza, Salem", contact: "+91 90000 30008", hours: "8:00–22:00", notes: "Volunteer-verified, daytime safe spot" },
+      { id: "S011", name: "Corner Cafe", verified: true, address: "22 Green Park, Salem", contact: "+91 90000 30004", hours: "7:00–23:00", notes: "Duplicate entry for testing" },
+      { id: "S012", name: "SafeTech Electronics", verified: true, address: "88 Commerce Road, Salem", contact: "+91 90000 30009", hours: "10:00–19:00", notes: "Verified seller, CCTV present" }
+    ];
+
+    // ---------- Render shops (frontend only) ----------
+    function renderShops(shops){
       const el = document.getElementById('shopsList');
-      if (!shops.length) return el.innerHTML = '<div class="muted">No shops available</div>';
+      if(!el) return;
+      if(!shops || shops.length === 0){
+        el.innerHTML = '<div class="muted">No shops available</div>';
+        return;
+      }
+
+      // store in session for quick access
       sessionStorage.setItem('hs_shops', JSON.stringify(shops));
-      el.innerHTML = shops.map(s => `
-        <div class="card mini" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700">${s.name} ${s.verified ? '✅' : ''}</div>
-            <div class="muted">${s.address || ''}</div>
-            <div class="muted">Contact: ${s.contact || '—'}</div>
-          </div>
-          <div style="text-align:right">
-            <button class="btn" onclick="alert('Calling shop (mock)')">Call</button>
-            <button class="btn" onclick="showShopProfile('${s.id}')">Profile</button>
-          </div>
-        </div>
-      `).join('');
+
+      // build DOM nodes for accessibility and interaction
+      el.innerHTML = '';
+      shops.forEach(s => {
+        const card = document.createElement('article');
+        card.className = 'shop-card';
+        card.setAttribute('role','article');
+        card.setAttribute('aria-labelledby','shop-'+s.id);
+
+        const left = document.createElement('div');
+        left.className = 'shop-left';
+        left.innerHTML = `
+          <div id="shop-${s.id}" class="shop-name">${escapeHtml(s.name)} ${s.verified ? '<span class="verified-badge" aria-hidden="true">✅</span>' : ''}</div>
+          <div class="shop-meta">${escapeHtml(s.address || '')}</div>
+          <div class="shop-meta">Contact: ${escapeHtml(s.contact || '—')}</div>
+          <div class="shop-meta muted" style="margin-top:6px">Hours: ${escapeHtml(s.hours || '—')}</div>
+        `;
+
+        const actions = document.createElement('div');
+        actions.className = 'shop-actions';
+        // Call button
+        const callBtn = document.createElement('button');
+        callBtn.className = 'btn primary';
+        callBtn.textContent = 'Call';
+        callBtn.addEventListener('click', ()=> callShop(s.id));
+        // Profile button
+        const profBtn = document.createElement('button');
+        profBtn.className = 'btn';
+        profBtn.textContent = 'Profile';
+        profBtn.addEventListener('click', ()=> showShopProfile(s.id));
+
+        actions.appendChild(callBtn);
+        actions.appendChild(profBtn);
+
+        card.appendChild(left);
+        card.appendChild(actions);
+        el.appendChild(card);
+      });
     }
 
-    loadShops();
+    // ---------- Actions ----------
+    function callShop(id){
+      const shops = JSON.parse(sessionStorage.getItem('hs_shops') || '[]');
+      const s = shops.find(x => x.id === id) || SAMPLE_SHOPS.find(x => x.id === id);
+      if(!s) return alert('Shop not found');
+      // Mock call flow: show contact details and copy option
+      const msg = `Calling (mock) — ${s.name}\nPhone: ${s.contact}\nAddress: ${s.address}\n\nThis is a demo action. In a real app, this would initiate a phone call or open a dialer.`;
+      alert(msg);
+    }
+
+    function showShopProfile(id){
+      const shops = JSON.parse(sessionStorage.getItem('hs_shops') || '[]');
+      const s = shops.find(x => x.id === id) || SAMPLE_SHOPS.find(x => x.id === id);
+      if(!s) return alert('Shop not found');
+
+      // Build modal content
+      const modalRoot = document.getElementById('modalRoot');
+      modalRoot.innerHTML = '';
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.tabIndex = -1;
+
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.setAttribute('role','dialog');
+      modal.setAttribute('aria-modal','true');
+      modal.setAttribute('aria-labelledby','modalTitle');
+
+      modal.innerHTML = `
+        <h3 id="modalTitle">${escapeHtml(s.name)} ${s.verified ? '<span class="verified-badge">✅ Verified</span>' : ''}</h3>
+        <p><strong>Address:</strong> ${escapeHtml(s.address || '—')}</p>
+        <p><strong>Contact:</strong> ${escapeHtml(s.contact || '—')}</p>
+        <p><strong>Hours:</strong> ${escapeHtml(s.hours || '—')}</p>
+        <p><strong>Notes:</strong> ${escapeHtml(s.notes || '—')}</p>
+        <div class="actions">
+          <button id="modalClose" class="btn">Close</button>
+          <button id="modalCopy" class="btn primary">Copy Contact</button>
+        </div>
+      `;
+
+      backdrop.appendChild(modal);
+      modalRoot.appendChild(backdrop);
+      modalRoot.setAttribute('aria-hidden','false');
+
+      // focus management
+      const closeBtn = modal.querySelector('#modalClose');
+      const copyBtn = modal.querySelector('#modalCopy');
+      closeBtn.focus();
+
+      function cleanup(){
+        modalRoot.innerHTML = '';
+        modalRoot.setAttribute('aria-hidden','true');
+      }
+
+      closeBtn.addEventListener('click', cleanup);
+      backdrop.addEventListener('click', (ev)=> { if(ev.target === backdrop) cleanup(); });
+      copyBtn.addEventListener('click', ()=>{
+        // copy contact to clipboard if available
+        const text = `${s.name} — ${s.contact || ''}`;
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(text).then(()=> {
+            alert('Contact copied to clipboard');
+          }).catch(()=> {
+            alert('Unable to copy. Contact: ' + (s.contact || '—'));
+          });
+        } else {
+          alert('Contact: ' + (s.contact || '—'));
+        }
+      });
+
+      // keyboard: Esc to close
+      document.addEventListener('keydown', function onKey(e){
+        if(e.key === 'Escape'){ cleanup(); document.removeEventListener('keydown', onKey); }
+      });
+    }
+
+    // small HTML escape helper
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // ---------- Initialize ----------
+    (function init(){
+      // Render sample shops; you can shuffle or filter as needed
+      renderShops(SAMPLE_SHOPS);
+    })();
   </script>
 </body>
 </html>
