@@ -5,52 +5,183 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>HerShield — Recommended Drivers</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Local styles for drivers page */
+    :root{
+      --card-bg:#fff;
+      --muted:#666;
+      --accent:#2e7d32;
+      --radius:12px;
+    }
+    body{font-family:Inter,system-ui,Arial;margin:0;background:linear-gradient(135deg,#3b0f6f,#8b2be2);color:#111;-webkit-font-smoothing:antialiased}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;color:#fff}
+    .brand-title{font-weight:700;font-size:1.05rem}
+    .tagline{font-size:0.85rem;opacity:0.95}
+    .topnav a{color:rgba(255,255,255,0.95);margin-left:12px;text-decoration:none;font-weight:600}
+    .container{max-width:1100px;margin:20px auto;padding:12px}
+    .card{background:var(--card-bg);border-radius:var(--radius);padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.12)}
+    .muted{color:var(--muted)}
+    .driver-list{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+    .driver-card{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fafafa);border:1px solid rgba(0,0,0,0.04)}
+    .driver-left{max-width:70%}
+    .driver-name{font-weight:800;margin-bottom:6px}
+    .driver-meta{color:var(--muted);font-size:0.95rem;margin-bottom:4px}
+    .driver-actions{display:flex;gap:8px;flex-direction:column;align-items:flex-end}
+    .btn{padding:8px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:#fff;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,#ffd966,#d4af37);border:none;font-weight:700}
+    .badge{font-weight:700;color:var(--accent);margin-left:8px}
+    .sr-only{position:absolute;left:-9999px}
+    @media (max-width:720px){
+      .driver-card{flex-direction:column;align-items:flex-start}
+      .driver-actions{flex-direction:row;width:100%;justify-content:space-between;margin-top:8px}
+    }
+  </style>
 </head>
 <body class="app">
-  <header class="topbar">
-    <div class="brand-center">
+  <header class="topbar" role="banner">
+    <div>
       <div class="brand-title">HerShield <strong>AI+</strong></div>
-      <div class="tagline">Made for women, By women</div>
+      <div class="tagline">Made for women, by women</div>
     </div>
-    <nav class="topnav"><a href="home.html">Home</a><a href="sos.html">SOS</a></nav>
-    <div class="corner-time" id="headerTime">--:--</div>
+    <nav class="topnav" aria-label="Main navigation">
+      <a href="home.html">Home</a>
+      <a href="sos.html">SOS</a>
+    </nav>
+    <div id="headerTime" aria-hidden="true">--:--</div>
   </header>
 
-  <main class="container">
-    <section class="card">
-      <h2>Recommended Drivers</h2>
+  <main class="container" role="main">
+    <section class="card" aria-labelledby="driversTitle">
+      <h2 id="driversTitle">Recommended Drivers</h2>
       <p class="muted">Drivers recommended based on female-friendly ratings and feedback. Book or view profile (mock).</p>
 
-      <div id="driverList" style="margin-top:12px"></div>
+      <div id="driverList" class="driver-list" aria-live="polite"></div>
     </section>
   </main>
 
-  <script src="main.js"></script>
   <script>
+    // small clock helper
+    function startClock(id){
+      const el = document.getElementById(id);
+      if(!el) return;
+      function tick(){ const d = new Date(); el.textContent = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+      tick(); setInterval(tick, 60*1000);
+    }
     startClock('headerTime');
 
-    async function loadDrivers(){
-      const drivers = await fetch(window.HS_API + '/api/drivers').then(r=>r.json()).catch(()=>[]);
+    // ---------- Frontend-only sample drivers (12 entries, duplicates included) ----------
+    const SAMPLE_DRIVERS = [
+      { id: "D001", name: "Suresh Kumar", rating: 4.9, feedbackCount: 124, femaleFriendly: true, platform: "Ola", vehicle: "Sedan (White)", contact: "+91 90000 20001", notes: "Experienced, punctual, verified by community" },
+      { id: "D002", name: "Ravi Shankar", rating: 4.8, feedbackCount: 98, femaleFriendly: true, platform: "Uber", vehicle: "SUV (Black)", contact: "+91 90000 20002", notes: "Calm driver, good with late-night rides" },
+      { id: "D003", name: "Priya's Driver (Ajay)", rating: 4.7, feedbackCount: 76, femaleFriendly: true, platform: "Rapido", vehicle: "Hatchback (Blue)", contact: "+91 90000 20003", notes: "Trusted by local volunteers" },
+      { id: "D004", name: "Kumar R", rating: 4.6, feedbackCount: 64, femaleFriendly: true, platform: "Ola", vehicle: "Sedan (Silver)", contact: "+91 90000 20004", notes: "Friendly, speaks English and Tamil" },
+      { id: "D005", name: "Mani V", rating: 4.9, feedbackCount: 210, femaleFriendly: true, platform: "Uber", vehicle: "SUV (White)", contact: "+91 90000 20005", notes: "High safety score, verified ID" },
+      { id: "D006", name: "Ravi Shankar", rating: 4.8, feedbackCount: 98, femaleFriendly: true, platform: "Uber", vehicle: "SUV (Black)", contact: "+91 90000 20002", notes: "Duplicate entry for testing" },
+      { id: "D007", name: "Suresh Kumar", rating: 4.9, feedbackCount: 124, femaleFriendly: true, platform: "Ola", vehicle: "Sedan (White)", contact: "+91 90000 20001", notes: "Duplicate entry for testing" },
+      { id: "D008", name: "Lakshmi's Driver (Vikram)", rating: 4.5, feedbackCount: 42, femaleFriendly: true, platform: "Local", vehicle: "Hatchback (Red)", contact: "+91 90000 20006", notes: "Good for short trips" },
+      { id: "D009", name: "Arun P", rating: 4.4, feedbackCount: 30, femaleFriendly: false, platform: "Rapido", vehicle: "Bike (Black)", contact: "+91 90000 20007", notes: "Two-wheeler option, daytime only" },
+      { id: "D010", name: "Meena's Driver (Sathish)", rating: 4.8, feedbackCount: 88, femaleFriendly: true, platform: "Ola", vehicle: "Sedan (Maroon)", contact: "+91 90000 20008", notes: "Trusted by local community groups" },
+      { id: "D011", name: "SafeRide (Team)", rating: 4.9, feedbackCount: 320, femaleFriendly: true, platform: "SafeRide", vehicle: "Multiple", contact: "+91 90000 20009", notes: "Volunteer-run verified drivers" },
+      { id: "D012", name: "Naveen K", rating: 4.6, feedbackCount: 55, femaleFriendly: true, platform: "Uber", vehicle: "Sedan (Grey)", contact: "+91 90000 20010", notes: "Good local knowledge, polite" }
+    ];
+
+    // ---------- Render drivers (frontend only) ----------
+    function renderDrivers(drivers){
       const el = document.getElementById('driverList');
-      if (!drivers.length) return el.innerHTML = '<div class="muted">No drivers available</div>';
-      const enriched = drivers.map(d => ({ ...d, platform: d.platform || (d.id==='d1' ? 'Ola' : d.id==='d2' ? 'Uber' : 'Rapido') }));
-      sessionStorage.setItem('hs_drivers', JSON.stringify(enriched));
-      el.innerHTML = enriched.map(d => `
-        <div class="card mini" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700">${d.name} • ${d.rating}★</div>
-            <div class="muted">${d.platform || '—'} • ${d.feedbackCount || 0} feedbacks</div>
-            <div class="muted">Female friendly: ${d.femaleFriendly ? 'Yes' : 'No'}</div>
-          </div>
-          <div style="text-align:right">
-            <button class="btn" onclick="bookDriver('${d.id}')">Book</button>
-            <button class="btn" onclick="showDriverProfile('${d.id}')">Profile</button>
-          </div>
-        </div>
-      `).join('');
+      if(!el) return;
+      if(!drivers || drivers.length === 0){
+        el.innerHTML = '<div class="muted">No drivers available</div>';
+        return;
+      }
+
+      // store in session for quick access
+      sessionStorage.setItem('hs_drivers', JSON.stringify(drivers));
+
+      // build DOM nodes for accessibility and interaction
+      el.innerHTML = '';
+      drivers.forEach(d => {
+        const card = document.createElement('article');
+        card.className = 'driver-card';
+        card.setAttribute('role','article');
+        card.setAttribute('aria-labelledby','driver-'+d.id);
+
+        const left = document.createElement('div');
+        left.className = 'driver-left';
+        left.innerHTML = `
+          <div id="driver-${d.id}" class="driver-name">${escapeHtml(d.name)} <span class="badge" aria-hidden="true">${d.femaleFriendly ? '♀' : ''}</span></div>
+          <div class="driver-meta">${escapeHtml(d.platform || '—')} • ${escapeHtml(d.vehicle || '—')} • ${escapeHtml(String(d.rating))}★ • ${escapeHtml(String(d.feedbackCount || 0))} feedbacks</div>
+          <div class="driver-meta">Contact: ${escapeHtml(d.contact || '—')}</div>
+          <div class="driver-meta muted" style="margin-top:6px">${escapeHtml(d.notes || '')}</div>
+        `;
+
+        const actions = document.createElement('div');
+        actions.className = 'driver-actions';
+        // Book button
+        const bookBtn = document.createElement('button');
+        bookBtn.className = 'btn primary';
+        bookBtn.textContent = 'Book';
+        bookBtn.addEventListener('click', ()=> bookDriver(d.id));
+        // Profile button
+        const profBtn = document.createElement('button');
+        profBtn.className = 'btn';
+        profBtn.textContent = 'Profile';
+        profBtn.addEventListener('click', ()=> showDriverProfile(d.id));
+
+        actions.appendChild(bookBtn);
+        actions.appendChild(profBtn);
+
+        card.appendChild(left);
+        card.appendChild(actions);
+        el.appendChild(card);
+      });
     }
 
-    loadDrivers();
+    // ---------- Actions ----------
+    function bookDriver(id){
+      const drivers = JSON.parse(sessionStorage.getItem('hs_drivers') || '[]');
+      const d = drivers.find(x => x.id === id) || SAMPLE_DRIVERS.find(x => x.id === id);
+      if(!d) return alert('Driver not found');
+      // Mock booking flow: show summary and copy contact option
+      const msg = [
+        `Booking (mock) — ${d.name}`,
+        `Platform: ${d.platform || '—'}`,
+        `Vehicle: ${d.vehicle || '—'}`,
+        `Rating: ${d.rating}★ (${d.feedbackCount || 0} feedbacks)`,
+        `Contact: ${d.contact || '—'}`,
+        '',
+        'This is a demo booking. In a real app you would be redirected to the ride platform or a secure booking flow.'
+      ].join('\n');
+      alert(msg);
+    }
+
+    function showDriverProfile(id){
+      const drivers = JSON.parse(sessionStorage.getItem('hs_drivers') || '[]');
+      const d = drivers.find(x => x.id === id) || SAMPLE_DRIVERS.find(x => x.id === id);
+      if(!d) return alert('Driver not found');
+      // Simple profile modal replacement using alert for demo
+      const profile = [
+        `Name: ${d.name}`,
+        `Platform: ${d.platform || '—'}`,
+        `Vehicle: ${d.vehicle || '—'}`,
+        `Rating: ${d.rating}★`,
+        `Feedbacks: ${d.feedbackCount || 0}`,
+        `Female friendly: ${d.femaleFriendly ? 'Yes' : 'No'}`,
+        `Contact: ${d.contact || '—'}`,
+        `Notes: ${d.notes || '—'}`,
+        '',
+        'This profile is a frontend demo. For production, replace with a secure profile modal or page.'
+      ].join('\n');
+      alert(profile);
+    }
+
+    // small HTML escape helper
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // ---------- Initialize ----------
+    (function init(){
+      // Render sample drivers; you can shuffle or filter as needed
+      renderDrivers(SAMPLE_DRIVERS);
+    })();
   </script>
 </body>
 </html>
