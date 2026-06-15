@@ -3,78 +3,313 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>HerShield — Police Patrol</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>HerShield — Police Patrol (Frontend Only)</title>
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root{
+      --bg1:#3b0f6f; --bg2:#8b2be2; --accent:#ff1744;
+      --card-bg:#fff; --muted:#666; --radius:12px;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;color:#111;background:linear-gradient(135deg,var(--bg1),var(--bg2));-webkit-font-smoothing:antialiased}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;color:#fff}
+    .brand-title{font-weight:700;font-size:1.05rem}
+    .tagline{font-size:0.85rem;opacity:0.95}
+    .topnav a{color:rgba(255,255,255,0.95);margin-left:12px;text-decoration:none;font-weight:600}
+    .container{max-width:1100px;margin:20px auto;padding:12px}
+    .card{background:var(--card-bg);border-radius:var(--radius);padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.12)}
+    .muted{color:var(--muted)}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+    .btn{padding:8px 12px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:#fff;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,#ffd966,#d4af37);border:none;font-weight:800}
+    select.btn{padding:8px 10px}
+    #map{height:420px;border-radius:10px;margin-top:12px;overflow:hidden}
+    .small-note{font-size:0.9rem;color:#444;margin-top:8px}
+    /* List view */
+    .list-panel{margin-top:12px;display:flex;gap:12px;flex-direction:column}
+    .patrol-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow:auto}
+    .patrol-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg,#fff,#fafafa);border:1px solid rgba(0,0,0,0.04);cursor:pointer}
+    .patrol-item:focus{outline:none;box-shadow:0 0 0 4px rgba(212,175,55,0.12)}
+    .patrol-name{font-weight:700}
+    .patrol-distance{color:var(--muted);font-size:0.95rem}
+    .highlighted{box-shadow:0 6px 20px rgba(255,23,68,0.12);border:1px solid rgba(255,23,68,0.18)}
+    /* Responsive */
+    @media (max-width:720px){
+      .controls{flex-direction:column;align-items:stretch}
+      #map{height:360px}
+    }
+  </style>
 </head>
-<body class="app">
-  <header class="topbar">
-    <div class="brand-center">
+<body>
+  <header class="topbar" role="banner">
+    <div>
       <div class="brand-title">HerShield <strong>AI+</strong></div>
-      <div class="tagline">Made for women, By women</div>
+      <div class="tagline">Made for women, by women</div>
     </div>
-    <nav class="topnav" aria-label="Main navigation"><a href="home.html">Home</a><a href="unsafe.html">Check‑in</a></nav>
-    <div class="corner-time" id="headerTime">--:--</div>
+    <nav class="topnav" aria-label="Main navigation">
+      <a href="home.html">Home</a>
+      <a href="unsafe.html">Check‑in</a>
+    </nav>
+    <div aria-hidden="true" id="headerTime">--:--</div>
   </header>
 
-  <main class="container">
-    <section class="card">
-      <h2>Police Patrol Map — Chennai</h2>
-      <p class="muted">Live patrol positions are pushed from the backend in real time.</p>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="refresh" class="btn primary">Refresh Patrols</button>
-        <button id="centerMe" class="btn">Center on my location</button>
+  <main class="container" role="main">
+    <section class="card" aria-labelledby="patrolTitle">
+      <h2 id="patrolTitle">Police Patrol Map — Simulated (Frontend Only)</h2>
+      <p class="muted">Patrols are generated in the browser as red dots. Use the controls to refresh and view distances.</p>
+
+      <div class="controls" role="group" aria-label="Patrol controls">
+        <button id="refresh" class="btn primary" title="Refresh patrols around current map center">Refresh Patrols</button>
+        <button id="centerMe" class="btn" title="Center map on your current location">Center on my location</button>
+
+        <label for="count" style="margin-left:8px">Patrol count</label>
+        <select id="count" class="btn" aria-label="Number of patrols">
+          <option value="5">5</option>
+          <option value="8" selected>8</option>
+          <option value="12">12</option>
+          <option value="18">18</option>
+        </select>
+
+        <label for="radius" style="margin-left:8px">Radius (km)</label>
+        <select id="radius" class="btn" aria-label="Patrol radius">
+          <option value="1">1 km</option>
+          <option value="2" selected>2 km</option>
+          <option value="5">5 km</option>
+        </select>
       </div>
-      <div id="map" style="height:560px;margin-top:12px;border-radius:12px;overflow:hidden"></div>
+
+      <div id="map" role="region" aria-label="Patrol map"></div>
+      <div id="statusNote" class="small-note" aria-live="polite"></div>
+
+      <div class="list-panel" aria-labelledby="listTitle">
+        <h3 id="listTitle" style="margin:12px 0 6px 0">Patrols near chosen location</h3>
+        <ul id="patrolList" class="patrol-list" role="list" aria-live="polite"></ul>
+      </div>
     </section>
   </main>
 
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="main.js"></script>
+
   <script>
-    startClock('headerTime');
-    startDynamicBackground();
+  // ---------- Helpers ----------
+  function startClock(id){
+    const el = document.getElementById(id);
+    if(!el) return;
+    function tick(){ const d=new Date(); el.textContent = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+    tick(); setInterval(tick, 60*1000);
+  }
+  startClock('headerTime');
 
-    const map = L.map('map').setView([13.0827,80.2707], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-    let markers = {};
-    function renderPatrols(list) {
-      // remove markers not in list
-      const ids = list.map(p => p.id);
-      Object.keys(markers).forEach(k => { if (!ids.includes(k)) { map.removeLayer(markers[k]); delete markers[k]; } });
-      list.forEach(p => {
-        if (markers[p.id]) {
-          markers[p.id].setLatLng([p.lat, p.lng]);
-          markers[p.id].setPopupContent(`<strong>${p.name}</strong><br/>${p.ts}`);
-        } else {
-          const m = L.circleMarker([p.lat,p.lng], { radius:7, color:'#ff3b6f', fillColor:'#ff3b6f', fillOpacity:0.95 }).addTo(map);
-          m.bindPopup(`<strong>${p.name}</strong><br/>${p.ts}`);
-          markers[p.id] = m;
-        }
-      });
-    }
+  // Haversine distance in kilometers
+  function haversineDistance(lat1, lon1, lat2, lon2){
+    const toRad = x => x * Math.PI / 180;
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
 
-    // initial fetch (fallback)
-    async function loadLivePatrolsOnce(){
-      const res = await fetch(window.HS_API + '/api/patrols/live').then(r=>r.json()).catch(()=>[]);
-      renderPatrols(res);
-      if (res.length) map.setView([res[0].lat, res[0].lng], 13);
-    }
+  // ---------- Map setup ----------
+  const map = L.map('map', { preferCanvas: true }).setView([13.0827,80.2707], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
 
-    document.getElementById('refresh').addEventListener('click', loadLivePatrolsOnce);
-    document.getElementById('centerMe').addEventListener('click', async () => {
-      try { const pos = await getCurrentPosition(8000); map.setView([pos.lat, pos.lng], 14); L.circle([pos.lat, pos.lng], { radius: 80, color:'#6dd3ff', fillOpacity:0.06 }).addTo(map); } catch(e){ alert('Location not available'); }
+  const markers = {}; // id -> marker
+  let currentPatrols = []; // array of patrol objects
+  let lastCenter = map.getCenter();
+
+  const patrolStyle = { radius:7, color:'#b71c1c', weight:1.5, fillColor:'#ff1744', fillOpacity:0.95 };
+
+  // ---------- Rendering ----------
+  function renderPatrols(list, centerOnFirst=false){
+    const ids = list.map(p => String(p.id));
+    // remove markers not in list
+    Object.keys(markers).forEach(k => { if(!ids.includes(k)){ try{ map.removeLayer(markers[k]); }catch(e){} delete markers[k]; } });
+
+    list.forEach(p => {
+      const id = String(p.id);
+      const latlng = [Number(p.lat), Number(p.lng)];
+      const popup = `<strong>${escapeHtml(p.name || ('Patrol ' + id))}</strong><br/><span class="muted">${new Date(p.ts || Date.now()).toLocaleString()}</span>`;
+      if(markers[id]){
+        markers[id].setLatLng(latlng);
+        markers[id].setPopupContent(popup);
+      } else {
+        const m = L.circleMarker(latlng, patrolStyle).addTo(map);
+        m.bindPopup(popup);
+        markers[id] = m;
+      }
     });
 
-    // listen for socket updates
-    window.addEventListener('patrols:update', (ev) => {
-      const list = ev.detail || [];
-      renderPatrols(list);
+    // update list view
+    currentPatrols = list.map(p => Object.assign({}, p)); // shallow copy
+    updateListView();
+
+    if(centerOnFirst && list.length){
+      map.setView([list[0].lat, list[0].lng], Math.max(map.getZoom(), 13));
+    }
+  }
+
+  // ---------- List view ----------
+  const patrolListEl = document.getElementById('patrolList');
+
+  function updateListView(){
+    const center = lastCenter || map.getCenter();
+    // compute distances
+    const enriched = currentPatrols.map(p => {
+      const d = haversineDistance(center.lat, center.lng, Number(p.lat), Number(p.lng));
+      return Object.assign({}, p, { distanceKm: d });
+    });
+    // sort by distance ascending
+    enriched.sort((a,b) => a.distanceKm - b.distanceKm);
+
+    // render
+    patrolListEl.innerHTML = '';
+    enriched.forEach((p, idx) => {
+      const li = document.createElement('li');
+      li.className = 'patrol-item';
+      li.tabIndex = 0;
+      li.setAttribute('role','listitem');
+      li.dataset.patrolId = p.id;
+
+      const left = document.createElement('div');
+      left.innerHTML = `<div class="patrol-name">${escapeHtml(p.name || ('Patrol ' + (idx+1)))}</div>
+                        <div class="muted" style="font-size:0.9rem">${new Date(p.ts || Date.now()).toLocaleString()}</div>`;
+
+      const right = document.createElement('div');
+      right.innerHTML = `<div class="patrol-distance">${p.distanceKm.toFixed(2)} km</div>`;
+
+      li.appendChild(left);
+      li.appendChild(right);
+
+      // click/focus handlers to highlight marker
+      li.addEventListener('click', ()=> highlightPatrol(p.id));
+      li.addEventListener('keydown', (ev)=> { if(ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); highlightPatrol(p.id); } });
+
+      patrolListEl.appendChild(li);
     });
 
-    // start with a one-time load
-    loadLivePatrolsOnce();
+    // If no patrols
+    if(enriched.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'muted';
+      empty.textContent = 'No patrols available. Click Refresh to generate patrols.';
+      patrolListEl.appendChild(empty);
+    }
+  }
+
+  function highlightPatrol(id){
+    // remove highlight class from all list items
+    patrolListEl.querySelectorAll('.patrol-item').forEach(el => el.classList.remove('highlighted'));
+    // add to clicked
+    const clicked = patrolListEl.querySelector(`[data-patrol-id="${id}"]`);
+    if(clicked) clicked.classList.add('highlighted');
+
+    // highlight marker: open popup and set view
+    const m = markers[String(id)];
+    if(m){
+      m.openPopup();
+      map.panTo(m.getLatLng(), { animate: true, duration: 0.6 });
+      // briefly pulse style
+      const origStyle = { color: m.options.color, fillColor: m.options.fillColor, radius: m.options.radius };
+      m.setStyle({ color: '#ff9800', fillColor: '#ffcc80', radius: Math.min(origStyle.radius + 4, 14) });
+      setTimeout(()=> {
+        try { m.setStyle(origStyle); } catch(e){}
+      }, 1400);
+    }
+  }
+
+  // ---------- Simulation ----------
+  function generateSimulatedPatrols(center, count=8, radiusKm=2){
+    const cLat = Number(center.lat || center.lat);
+    const cLng = Number(center.lng || center.lng);
+    const list = [];
+    for(let i=0;i<count;i++){
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * radiusKm; // km
+      const dLat = (dist / 111) * Math.cos(angle);
+      const dLng = (dist / (111 * Math.cos(cLat * Math.PI / 180))) * Math.sin(angle);
+      const lat = cLat + dLat;
+      const lng = cLng + dLng;
+      list.push({ id: 'sim-' + i + '-' + Date.now(), name: 'Patrol ' + (i+1), lat, lng, ts: Date.now() });
+    }
+    return list;
+  }
+
+  // ---------- Refresh logic ----------
+  async function refreshPatrols({center=null, count=null, radiusKm=null, centerOnFirst=false} = {}){
+    const countSel = document.getElementById('count');
+    const radiusSel = document.getElementById('radius');
+    const status = document.getElementById('statusNote');
+
+    const c = center || map.getCenter();
+    lastCenter = c;
+    const cnt = count || Number(countSel.value || 8);
+    const rad = radiusKm || Number(radiusSel.value || 2);
+
+    status.textContent = 'Refreshing patrols...';
+    try {
+      // purely frontend: generate simulated patrols
+      const list = generateSimulatedPatrols({lat:c.lat, lng:c.lng}, cnt, rad);
+      renderPatrols(list, centerOnFirst);
+      status.textContent = `Showing ${list.length} patrols around chosen location.`;
+    } catch(err){
+      console.error(err);
+      status.textContent = 'Unable to refresh patrols.';
+    }
+  }
+
+  // ---------- Geolocation helper ----------
+  function getCurrentPosition(timeout = 10000){
+    return new Promise((resolve, reject) => {
+      if(!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+      let done = false;
+      const timer = setTimeout(()=>{ if(!done){ done=true; reject(new Error('Timeout')); } }, timeout);
+      navigator.geolocation.getCurrentPosition(pos => {
+        if(done) return;
+        done = true; clearTimeout(timer);
+        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
+      }, err => {
+        if(done) return;
+        done = true; clearTimeout(timer);
+        reject(err);
+      }, { enableHighAccuracy:true, timeout, maximumAge:0 });
+    });
+  }
+
+  // ---------- Event wiring ----------
+  document.getElementById('refresh').addEventListener('click', ()=> refreshPatrols({ center: map.getCenter() }));
+
+  document.getElementById('centerMe').addEventListener('click', async () => {
+    const status = document.getElementById('statusNote');
+    status.textContent = 'Getting your location...';
+    try {
+      const pos = await getCurrentPosition(10000);
+      map.setView([pos.lat, pos.lng], 14);
+      L.circle([pos.lat, pos.lng], { radius: Math.max(50, pos.accuracy || 50), color:'#6dd3ff', fillOpacity:0.06 }).addTo(map);
+      status.textContent = 'Centered on your location. Refreshing patrols nearby...';
+      refreshPatrols({ center: {lat: pos.lat, lng: pos.lng}, centerOnFirst: true });
+    } catch(err){
+      console.warn('Location error', err);
+      alert('Unable to get your location. Please allow location access or try again.');
+      document.getElementById('statusNote').textContent = 'Location not available.';
+    }
+  });
+
+  // initial load
+  (async function init(){
+    await refreshPatrols({ center: map.getCenter(), centerOnFirst: false });
+  })();
+
+  // Optional: auto-refresh every 30s (uncomment if desired)
+  // setInterval(()=> refreshPatrols({ center: map.getCenter() }), 30000);
   </script>
 </body>
 </html>
